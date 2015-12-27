@@ -1,0 +1,69 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Vladimir Stepanov"
+date: "26 декабря 2015 г."
+output: html_document
+---
+
+
+
+```{r}
+library(caret)
+library(randomForest)
+set.seed(12345)
+data_training <- read.csv("pml-training.csv", stringsAsFactors = FALSE)
+data_testing <- read.csv("pml-testing.csv", stringsAsFactors = FALSE)
+
+# columns to skip: user name, timestamps, windows
+skip <- c(1, 2, 3, 4, 5, 6, 7)
+data_training <- data_training[,-skip]
+data_testing <- data_testing[,-skip]
+
+# cleaning the testing set:
+# excluding columns with NAs
+notNAs <- (apply(data_testing, 2, function(x) { sum(is.na(x)) } ) == 0)
+data_testing <- data_testing[,notNAs]
+# excluding columns with empty values
+notEVs <- (apply(data_testing, 2, function(x) { sum(x == "") } ) == 0)
+data_testing <- data_testing[,notEVs]
+
+# we only need columns presented in the testing set
+# (test set does not contain the classe variable)
+data_training <- data_training[,
+                               names(data_training) %in%
+                                 c(names(data_testing), "classe")]
+
+# we may check data_training for NAs and empty cells — there are none
+
+# creating the training and cross-vadidation sets
+inTrain <- createDataPartition(y=data_training$classe, p=0.60, list=FALSE)
+training <- data_training[inTrain, ]
+testing <- data_training[-inTrain, ]
+
+# current position of the classe variable
+keyVPos <- dim(data_training)[2]
+
+modelFit <- randomForest(y = as.factor(training$classe),
+                         x = training[,-keyVPos])
+confusionMatrix(testing$classe, predict(modelFit, testing))
+
+answers <- predict(modelFit, data_testing)
+
+# pp <- preProcess(training, method="pca", thresh=0.95)
+# sort(unique(data_training$user_name))
+# [1] "adelmo"   "carlitos" "charles"  "eurico"   "jeremy"   "pedro"   
+# sort(unique(data_testing$user_name))
+# [1] "adelmo"   "carlitos" "charles"  "eurico"   "jeremy"   "pedro"   
+
+
+```
+
+```{r helpers}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+```
