@@ -1,24 +1,30 @@
 ---
-title: "Prediction Assignment Writeup"
+title: "Pracsical Machine Learning Prediction Assignment Writeup"
 author: "Vladimir Stepanov"
 date: "26 декабря 2015 г."
 output: html_document
 ---
 
+## Summary
 
-
-```{r}
+```{r preload,cache=TRUE}
 library(caret)
 library(randomForest)
 set.seed(12345)
 data_training <- read.csv("pml-training.csv", stringsAsFactors = FALSE)
 data_testing <- read.csv("pml-testing.csv", stringsAsFactors = FALSE)
-
+# sort(unique(data_training$user_name))
+# [1] "adelmo"   "carlitos" "charles"  "eurico"   "jeremy"   "pedro"
+# sort(unique(data_testing$user_name))
+# [1] "adelmo"   "carlitos" "charles"  "eurico"   "jeremy"   "pedro"
 # columns to skip: user name, timestamps, windows
 skip <- c(1, 2, 3, 4, 5, 6, 7)
 data_training <- data_training[,-skip]
 data_testing <- data_testing[,-skip]
+```
 
+
+```{r cleanup,cache=TRUE}
 # cleaning the testing set:
 # excluding columns with NAs
 notNAs <- (apply(data_testing, 2, function(x) { sum(is.na(x)) } ) == 0)
@@ -36,26 +42,20 @@ data_training <- data_training[,
 # we may check data_training for NAs and empty cells — there are none
 
 # creating the training and cross-vadidation sets
-inTrain <- createDataPartition(y=data_training$classe, p=0.60, list=FALSE)
+inTrain <- createDataPartition(y=data_training$classe, p=0.75, list=FALSE)
 training <- data_training[inTrain, ]
 testing <- data_training[-inTrain, ]
 
 # current position of the classe variable
 keyVPos <- dim(data_training)[2]
+```
 
+```{r modelling,cache=TRUE}
 modelFit <- randomForest(y = as.factor(training$classe),
                          x = training[,-keyVPos])
 confusionMatrix(testing$classe, predict(modelFit, testing))
 
 answers <- predict(modelFit, data_testing)
-
-# pp <- preProcess(training, method="pca", thresh=0.95)
-# sort(unique(data_training$user_name))
-# [1] "adelmo"   "carlitos" "charles"  "eurico"   "jeremy"   "pedro"   
-# sort(unique(data_testing$user_name))
-# [1] "adelmo"   "carlitos" "charles"  "eurico"   "jeremy"   "pedro"   
-
-
 ```
 
 ```{r helpers}
