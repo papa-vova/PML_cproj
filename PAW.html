@@ -67,56 +67,52 @@ img {
 </div>
 
 
-<div id="summary" class="section level2">
-<h2>Summary</h2>
-<pre class="r"><code>library(caret)</code></pre>
-<pre><code>## Loading required package: lattice
-## Loading required package: ggplot2</code></pre>
-<pre class="r"><code>library(randomForest)</code></pre>
-<pre><code>## randomForest 4.6-12
-## Type rfNews() to see new features/changes/bug fixes.
-## 
-## Attaching package: 'randomForest'
-## 
-## Следующий объект скрыт от 'package:ggplot2':
-## 
-##     margin</code></pre>
-<pre class="r"><code>set.seed(12345)
+<p>Data from the Human Activity Recognition project (<a href="http://groupware.les.inf.puc-rio.br/har"><a href="http://groupware.les.inf.puc-rio.br/har" class="uri">http://groupware.les.inf.puc-rio.br/har</a></a>) is used to build a model for predicting the quality of performing the exercise (the <code>classe</code> variable from the dataset). We build a random forest model which shows about 99% predictive accuracy.</p>
+<div id="data-processing" class="section level2">
+<h2>Data processing</h2>
+<p>We use <code>caret</code> and <code>randomForest</code> packages and set the seed for reproducibility. While loading the data we treat strings as appropriate types (not factors). We also skip the first 7 columns as not relevant (they contain supplementary info and are not related to measurements).</p>
+<pre class="r"><code>library(caret)
+library(randomForest)
+set.seed(12345)
 data_training &lt;- read.csv(&quot;pml-training.csv&quot;, stringsAsFactors = FALSE)
 data_testing &lt;- read.csv(&quot;pml-testing.csv&quot;, stringsAsFactors = FALSE)
-# sort(unique(data_training$user_name))
-# [1] &quot;adelmo&quot;   &quot;carlitos&quot; &quot;charles&quot;  &quot;eurico&quot;   &quot;jeremy&quot;   &quot;pedro&quot;
-# sort(unique(data_testing$user_name))
-# [1] &quot;adelmo&quot;   &quot;carlitos&quot; &quot;charles&quot;  &quot;eurico&quot;   &quot;jeremy&quot;   &quot;pedro&quot;
-# columns to skip: user name, timestamps, windows
 skip &lt;- c(1, 2, 3, 4, 5, 6, 7)
-data_training &lt;- data_training[,-skip]
-data_testing &lt;- data_testing[,-skip]</code></pre>
-<pre class="r"><code># cleaning the testing set:
-# excluding columns with NAs
-notNAs &lt;- (apply(data_testing, 2, function(x) { sum(is.na(x)) } ) == 0)
-data_testing &lt;- data_testing[,notNAs]
+data_training &lt;- data_training[, -skip]
+data_testing &lt;- data_testing[, -skip]</code></pre>
+<p>After loading the data we exclude all fields (columns) that contain NAs or missing values. We do that for the test set — the one containing 20 test cases for submission — as fields that are not present there could not aid to their prediction.</p>
+<p>In the end, we pick up only necessary fields from both testing and training data sets. Then we split the training set 75/25 — for model training and for cross-validation respectively. We also not the position of the <code>classe</code> field in the training set.</p>
+<pre class="r"><code># cleaning the testing set: excluding columns with NAs
+notNAs &lt;- (apply(data_testing, 2, function(x) {
+    sum(is.na(x))
+}) == 0)
+data_testing &lt;- data_testing[, notNAs]
 # excluding columns with empty values
-notEVs &lt;- (apply(data_testing, 2, function(x) { sum(x == &quot;&quot;) } ) == 0)
-data_testing &lt;- data_testing[,notEVs]
+notEVs &lt;- (apply(data_testing, 2, function(x) {
+    sum(x == &quot;&quot;)
+}) == 0)
+data_testing &lt;- data_testing[, notEVs]
+# we only need columns presented in the testing set (test set does not
+# contain the classe variable)
+data_training &lt;- data_training[, names(data_training) %in% c(names(data_testing), 
+    &quot;classe&quot;)]
 
-# we only need columns presented in the testing set
-# (test set does not contain the classe variable)
-data_training &lt;- data_training[,
-                               names(data_training) %in%
-                                 c(names(data_testing), &quot;classe&quot;)]
-
-# we may check data_training for NAs and empty cells — there are none
+# we have checked the data_training set for NAs and empty cells (there were
+# none)
 
 # creating the training and cross-vadidation sets
-inTrain &lt;- createDataPartition(y=data_training$classe, p=0.75, list=FALSE)
+inTrain &lt;- createDataPartition(y = data_training$classe, p = 0.75, list = FALSE)
 training &lt;- data_training[inTrain, ]
 testing &lt;- data_training[-inTrain, ]
 
 # current position of the classe variable
 keyVPos &lt;- dim(data_training)[2]</code></pre>
-<pre class="r"><code>modelFit &lt;- randomForest(y = as.factor(training$classe),
-                         x = training[,-keyVPos])
+</div>
+<div id="modelling" class="section level2">
+<h2>Modelling</h2>
+<p>For modelling we employ the <code>randomForest</code> package. We build the confusion matrix and record the prediction for our 20 test cases in the <code>answers</code> data set.</p>
+<p>As seen from the accuracy, we expect the out of sample error to be around 1%.</p>
+<pre class="r"><code>modelFit &lt;- randomForest(y = as.factor(training$classe), x = training[, -keyVPos])
+answers &lt;- predict(modelFit, data_testing)
 confusionMatrix(testing$classe, predict(modelFit, testing))</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
@@ -149,14 +145,6 @@ confusionMatrix(testing$classe, predict(modelFit, testing))</code></pre>
 ## Detection Rate         0.2843   0.1913   0.1735   0.1625   0.1827
 ## Detection Prevalence   0.2845   0.1935   0.1743   0.1639   0.1837
 ## Balanced Accuracy      0.9977   0.9970   0.9920   0.9954   0.9994</code></pre>
-<pre class="r"><code>answers &lt;- predict(modelFit, data_testing)</code></pre>
-<pre class="r"><code>pml_write_files = function(x){
-  n = length(x)
-  for(i in 1:n){
-    filename = paste0(&quot;problem_id_&quot;,i,&quot;.txt&quot;)
-    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
-  }
-}</code></pre>
 </div>
 
 
